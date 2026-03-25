@@ -1,0 +1,31 @@
+version = 0.1
+
+[default.global.parameters]
+stack_name = "jmliumd-agent"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = false
+
+[default.deploy.parameters]
+stack_name = "jmliumd-agent"
+resolve_s3 = true
+s3_prefix = "jmliumd-agent"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = ""
+image_repositories = []
+
+[prod.deploy.parameters]
+stack_name = "jmliumd-agent"
+resolve_s3 = true
+s3_prefix = "jmliumd-agent-prod"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "OpenAIApiKey=\"EDIT-HERE\" SmtpHost=\"smtp.gmail.com\" SmtpPort=\"587\" SmtpSecure=\"false\" SmtpUser=\"EDIT-HERE\" SmtpPass=\"EDIT-HERE\" StaffEmail=\"EDIT-HERE\" FromEmail=\"EDIT-HERE\" GoogleChatWebhookUrl=\"EDIT-HERE\" CorsOrigin=\"https://jimliumd.com\" IngestStartUrl=\"https://jimliumd.com\" IngestMaxPages=\"40\""
+image_repositories = []

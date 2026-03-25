@@ -1,0 +1,10 @@
+# Local secrets and environment
+.env
+.env.*
+!.env.example
+agent-secret.json
+samconfig.toml
+
+# Build output
+.aws-sam/
+node_modules/

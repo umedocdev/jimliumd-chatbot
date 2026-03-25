@@ -1,0 +1,132 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: JimLiuMD AI Agent on Lambda + S3
+
+Parameters:
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+  SmtpHost:
+    Type: String
+    Default: smtp.gmail.com
+  SmtpPort:
+    Type: String
+    Default: "587"
+  SmtpSecure:
+    Type: String
+    Default: "false"
+  SmtpUser:
+    Type: String
+    Default: ""
+  SmtpPass:
+    Type: String
+    NoEcho: true
+    Default: ""
+  StaffEmail:
+    Type: String
+    Default: ""
+  FromEmail:
+    Type: String
+    Default: ""
+  GoogleChatWebhookUrl:
+    Type: String
+    NoEcho: true
+    Default: ""
+  CorsOrigin:
+    Type: String
+    Default: "https://jimliumd.com"
+  IngestStartUrl:
+    Type: String
+    Default: "https://jimliumd.com"
+  IngestMaxPages:
+    Type: String
+    Default: "40"
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 30
+    MemorySize: 1024
+    Architectures:
+      - x86_64
+    Environment:
+      Variables:
+        STORAGE_BACKEND: s3
+        S3_BUCKET: !Ref AgentDataBucket
+        S3_PREFIX: clinic-ai
+        PORT: "3000"
+        MODEL: gpt-4.1-mini
+        EMBEDDING_MODEL: text-embedding-3-small
+        MAX_PAGES: "40"
+        CHUNK_SIZE: "800"
+        CHUNK_OVERLAP: "120"
+        INTAKE_RATE_LIMIT_MAX: "5"
+        INTAKE_RATE_LIMIT_WINDOW_MS: "900000"
+        OPENAI_API_KEY: !Ref OpenAIApiKey
+
+Resources:
+  AgentDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      VersioningConfiguration:
+        Status: Enabled
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/lambda.handler
+      CodeUri: .
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref AgentDataBucket
+      Events:
+        ProxyApi:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        RootApi:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+      Environment:
+        Variables:
+          SMTP_HOST: !Ref SmtpHost
+          SMTP_PORT: !Ref SmtpPort
+          SMTP_SECURE: !Ref SmtpSecure
+          SMTP_USER: !Ref SmtpUser
+          SMTP_PASS: !Ref SmtpPass
+          STAFF_EMAIL: !Ref StaffEmail
+          FROM_EMAIL: !Ref FromEmail
+          GOOGLE_CHAT_WEBHOOK_URL: !Ref GoogleChatWebhookUrl
+          CORS_ORIGIN: !Ref CorsOrigin
+
+  IngestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src/lambdaIngest.handler
+      CodeUri: .
+      Timeout: 180
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref AgentDataBucket
+      Environment:
+        Variables:
+          INGEST_START_URL: !Ref IngestStartUrl
+          INGEST_MAX_PAGES: !Ref IngestMaxPages
+      Events:
+        DailyIngest:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 6 * * ? *)
+            Name: jimliumd-agent-daily-ingest
+            Enabled: true
+
+Outputs:
+  HttpApiUrl:
+    Description: Lambda HTTP API endpoint
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  DataBucketName:
+    Description: S3 bucket for knowledge/leads JSON
+    Value: !Ref AgentDataBucket
