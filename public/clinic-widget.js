@@ -3,6 +3,12 @@
   const apiBase = (script?.dataset?.apiBase || "").replace(/\/$/, "");
   const assistantName = script?.dataset?.assistantName || "Clinic Assistant";
   const accent = script?.dataset?.accent || "#0b6b61";
+  const iconCandidates = [
+    script?.dataset?.iconUrl || "https://jimliumd.com/wp-content/uploads/2026/03/helpdesk-icon-100x100-1.png",
+    apiBase ? `${apiBase}/images/helpdesk-icon-100x100.png` : "",
+    script?.src ? new URL("images/helpdesk-icon-100x100.png", script.src).toString() : "",
+    script?.src ? new URL("/images/helpdesk-icon-100x100.png", script.src).toString() : "",
+  ].filter(Boolean);
   const autoOpenMsRaw = script?.dataset?.autoOpenMs || "10000";
   const autoOpenMs = Number.parseInt(autoOpenMsRaw, 10);
   const showSources = String(script?.dataset?.showSources || "false").toLowerCase() === "true";
@@ -49,14 +55,20 @@
         border-radius: 999px;
         border: 0;
         background-color: #ffffff;
-        background-image: url("/images/helpdesk-icon-100x100.png");
-        background-repeat: no-repeat;
-        background-position: center;
-        background-size: cover;
         color: transparent;
         font-size: 0;
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
         cursor: pointer;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        padding: 0;
+      }
+      .cai-btn-icon {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
       }
       .cai-panel {
         display: none;
@@ -237,13 +249,16 @@
         <div class="cai-tail-gap"></div>
       </div>
     </div>
-    <button class="cai-btn" id="cai-toggle" aria-label="Open clinic assistant"></button>
+    <button class="cai-btn" id="cai-toggle" aria-label="Open clinic assistant">
+      <img id="cai-btn-icon" class="cai-btn-icon" alt="Chat support" />
+    </button>
   `;
 
   document.body.appendChild(root);
 
   const panel = root.querySelector("#cai-panel");
   const toggle = root.querySelector("#cai-toggle");
+  const toggleIcon = root.querySelector("#cai-btn-icon");
   const closeHeadBtn = root.querySelector("#cai-close-head");
   const log = root.querySelector("#cai-log");
   const qInput = root.querySelector("#cai-question");
@@ -618,6 +633,17 @@
         setPanelOpen(true);
       }
     }, autoOpenMs);
+  }
+
+  if (toggleIcon && iconCandidates.length) {
+    let idx = 0;
+    const loadNext = () => {
+      if (idx >= iconCandidates.length) return;
+      toggleIcon.src = iconCandidates[idx];
+      idx += 1;
+    };
+    toggleIcon.addEventListener("error", loadNext);
+    loadNext();
   }
 
   renderInlineOnboarding();
