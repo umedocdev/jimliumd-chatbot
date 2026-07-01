@@ -120,7 +120,7 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: cron(0 6 * * ? *)
-            Name: jimliumd-agent-daily-ingest
+            Name: !Sub "${AWS::StackName}-daily-ingest"
             Enabled: true
 
 Outputs:

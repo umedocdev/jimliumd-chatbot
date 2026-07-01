@@ -29,3 +29,13 @@ confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "OpenAIApiKey=\"EDIT-HERE\" SmtpHost=\"smtp.gmail.com\" SmtpPort=\"587\" SmtpSecure=\"false\" SmtpUser=\"EDIT-HERE\" SmtpPass=\"EDIT-HERE\" StaffEmail=\"EDIT-HERE\" FromEmail=\"EDIT-HERE\" GoogleChatWebhookUrl=\"EDIT-HERE\" CorsOrigin=\"https://jimliumd.com\" IngestStartUrl=\"https://jimliumd.com\" IngestMaxPages=\"40\""
 image_repositories = []
+
+[elevated.deploy.parameters]
+stack_name = "elevatedmedteam-agent"
+resolve_s3 = true
+s3_prefix = "elevatedmedteam-agent-prod"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+parameter_overrides = "OpenAIApiKey=\"EDIT-HERE\" SmtpHost=\"smtp.gmail.com\" SmtpPort=\"587\" SmtpSecure=\"false\" SmtpUser=\"EDIT-HERE\" SmtpPass=\"EDIT-HERE\" StaffEmail=\"EDIT-HERE\" FromEmail=\"EDIT-HERE\" GoogleChatWebhookUrl=\"EDIT-HERE\" CorsOrigin=\"https://elevatedmedteam.com\" IngestStartUrl=\"https://elevatedmedteam.com\" IngestMaxPages=\"40\""
+image_repositories = []

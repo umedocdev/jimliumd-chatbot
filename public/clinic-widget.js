@@ -14,6 +14,7 @@
   const showSources = String(script?.dataset?.showSources || "false").toLowerCase() === "true";
   const staffPhone = script?.dataset?.staffPhone || "(239) 524-0125";
   const staffEmail = script?.dataset?.staffEmail || "info@jimliumd.com";
+  const welcomeMessage = script?.dataset?.welcomeMessage || "Thank you for visiting JimLiuMD.com!";
 
   const toApi = (path) => `${apiBase}${path}`;
   const history = [];
@@ -25,6 +26,7 @@
   const customer = {
     name: "",
     email: "",
+    phone: "",
     onboarded: false,
   };
 
@@ -266,6 +268,7 @@
   let inlineOnboardWrap;
   let inlineNameInput;
   let inlineEmailInput;
+  let inlinePhoneInput;
   let inlineStartBtn;
   let inlineOnboardError;
 
@@ -314,7 +317,7 @@
   };
 
   const renderInlineOnboarding = () => {
-    addMessage("assistant", "Thank you for visiting JimLiuMD.com!");
+    addMessage("assistant", welcomeMessage);
     addMessage(
       "assistant",
       "I can help answer your questions about our programs and schedule a consultation with our staff."
@@ -326,6 +329,7 @@
     inlineOnboardWrap.innerHTML = `
       <input id="cai-name-inline" class="cai-input" placeholder="Name" />
       <input id="cai-email-inline" class="cai-input" placeholder="Email" type="email" />
+      <input id="cai-phone-inline" class="cai-input" placeholder="Phone number" type="tel" />
       <button id="cai-start-inline" class="cai-send" type="button">Start Chat</button>
       <div id="cai-onboard-error-inline" class="cai-onboard-error"></div>
     `;
@@ -334,35 +338,44 @@
 
     inlineNameInput = inlineOnboardWrap.querySelector("#cai-name-inline");
     inlineEmailInput = inlineOnboardWrap.querySelector("#cai-email-inline");
+    inlinePhoneInput = inlineOnboardWrap.querySelector("#cai-phone-inline");
     inlineStartBtn = inlineOnboardWrap.querySelector("#cai-start-inline");
     inlineOnboardError = inlineOnboardWrap.querySelector("#cai-onboard-error-inline");
 
     inlineStartBtn.addEventListener("click", () => {
       const name = inlineNameInput.value.trim();
       const email = inlineEmailInput.value.trim();
+      const phone = inlinePhoneInput.value.trim();
 
-      if (!name || !email) {
-        inlineOnboardError.textContent = "Please enter your name and email to continue.";
+      if (!name || !email || !phone) {
+        inlineOnboardError.textContent = "Please enter your name, email, and phone number to continue.";
         return;
       }
       if (!isValidEmail(email)) {
         inlineOnboardError.textContent = "Please enter a valid email address.";
         return;
       }
+      if (!isValidPhone(phone)) {
+        inlineOnboardError.textContent = "Please enter a valid phone number including area code.";
+        return;
+      }
 
       customer.name = name;
       customer.email = email;
+      customer.phone = phone;
       customer.onboarded = true;
       inlineOnboardWrap.remove();
-      addMessage("user", `My name is ${name}, and my email is ${email}.`);
+      addMessage("user", `My name is ${name}, my email is ${email}, and my phone number is ${phone}.`);
       addMessage("assistant", `Nice to meet you, ${name}. How can I help you today?`);
       enableChatInput();
     });
   };
 
   const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const isValidPhone = (value) => value.replace(/\D/g, "").length >= 10;
   const isYes = (value) => /^(yes|y|sure|ok|okay|please do|do it)$/i.test(value.trim());
   const isNo = (value) => /^(no|n|not now|nope)$/i.test(value.trim());
+  const isSkip = (value) => /^(skip|no phone|prefer not|rather not|email only)$/i.test(value.trim());
   const isBye = (value) => /\b(bye|goodbye|see you|talk to you later|thanks bye)\b/i.test(value);
   const wantsStaffConnection = (value) => {
     const text = value.toLowerCase();
@@ -379,7 +392,7 @@
     handoff.step = "idle";
     handoff.lead = {
       contactMethod: "",
-      phone: "",
+      phone: customer.phone || "",
       preferredTime: "",
     };
   };
@@ -388,7 +401,7 @@
     const payload = {
       name: customer.name,
       email: customer.email,
-      phone: handoff.lead.contactMethod === "phone" ? handoff.lead.phone : "(email follow-up)",
+      phone: handoff.lead.phone || "(not provided)",
       interest: "Requested staff consultation via chatbot",
       preferredTime: handoff.lead.preferredTime || "",
       message: `Preferred contact method: ${handoff.lead.contactMethod}`,
@@ -470,29 +483,87 @@
     if (handoff.step === "awaiting_method") {
       if (/^email$/i.test(text)) {
         handoff.lead.contactMethod = "email";
-        try {
-          const data = await submitLead();
-          addMessage(
-            "assistant",
-            data.emailStatus?.delivered
-              ? `Done. I sent your request to our staff, and they will reach you at ${customer.email}.`
-              : `I saved your request and our staff can contact you at ${customer.email}.`
-          );
-        } catch (error) {
-          addMessage("assistant", error.message || "Unable to submit request right now.");
+        handoff.lead.phone = customer.phone || handoff.lead.phone;
+        if (handoff.lead.phone) {
+          try {
+            const data = await submitLead();
+            addMessage(
+              "assistant",
+              data.emailStatus?.delivered
+                ? `Done. I sent your request to our staff, and they will reach you by email at ${customer.email}.`
+                : `I saved your request and our staff can contact you by email at ${customer.email}.`
+            );
+          } catch (error) {
+            addMessage("assistant", error.message || "Unable to submit request right now.");
+          }
+          resetHandoff();
+          return;
         }
-        resetHandoff();
+        handoff.step = "awaiting_optional_phone";
+        addMessage(
+          "assistant",
+          `Got it. We will use email as your preferred contact method at ${customer.email}. Please share a phone number as an optional backup contact, or type Skip.`
+        );
         return;
       }
 
       if (/^phone$/i.test(text)) {
         handoff.lead.contactMethod = "phone";
+        if (customer.phone) {
+          handoff.lead.phone = customer.phone;
+          handoff.step = "awaiting_phone_consent";
+          addMessage("assistant", `Do you consent for our staff to call you at ${customer.phone}?`);
+          addOptions([
+            {
+              label: "I Consent",
+              onClick: () => {
+                addMessage("user", "I consent");
+                handleHandoffInput("yes");
+              },
+            },
+            {
+              label: "No",
+              onClick: () => {
+                addMessage("user", "No");
+                handleHandoffInput("no");
+              },
+            },
+          ]);
+          return;
+        }
         handoff.step = "awaiting_phone";
         addMessage("assistant", "Please share the best phone number to reach you.");
         return;
       }
 
       addMessage("assistant", "Please choose Email or Phone.");
+      return;
+    }
+
+    if (handoff.step === "awaiting_optional_phone") {
+      if (isSkip(text)) {
+        handoff.lead.phone = "(not provided)";
+      } else {
+        const digits = text.replace(/\D/g, "");
+        if (digits.length < 10) {
+          addMessage("assistant", "Please enter a valid phone number including area code, or type Skip.");
+          return;
+        }
+        handoff.lead.phone = text;
+      }
+
+      try {
+        const data = await submitLead();
+        addMessage(
+          "assistant",
+          data.emailStatus?.delivered
+            ? `Done. I sent your request to our staff, and they will reach you by email at ${customer.email}.`
+            : `I saved your request and our staff can contact you by email at ${customer.email}.`
+        );
+      } catch (error) {
+        addMessage("assistant", error.message || "Unable to submit request right now.");
+      }
+      resetHandoff();
       return;
     }
 
@@ -561,8 +632,8 @@
     history.push({ role: "user", content: question });
 
     if (isBye(question)) {
-      addMessage("assistant", `Goodbye ${customer.name || ""}. Thank you for visiting JimLiuMD.com!`);
-      history.push({ role: "assistant", content: "Goodbye. Thank you for visiting JimLiuMD.com!" });
+      addMessage("assistant", `Goodbye ${customer.name || ""}. ${welcomeMessage}`);
+      history.push({ role: "assistant", content: `Goodbye. ${welcomeMessage}` });
       return;
     }
 
